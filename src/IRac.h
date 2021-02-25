@@ -62,6 +62,17 @@ class IRac {
                         const bool quiet, const bool turbo, const bool econo,
                         const bool light, const bool filter, const bool clean,
                         const bool beep, const int16_t sleep,
+                        const int16_t clock, const int8_t weekday);
+  static void initState(stdAc::state_t *state,
+                        const decode_type_t vendor, const int16_t model,
+                        const bool power, const stdAc::opmode_t mode,
+                        const float degrees, const bool celsius,
+                        const stdAc::fanspeed_t fan,
+                        const stdAc::swingv_t swingv,
+                        const stdAc::swingh_t swingh,
+                        const bool quiet, const bool turbo, const bool econo,
+                        const bool light, const bool filter, const bool clean,
+                        const bool beep, const int16_t sleep,
                         const int16_t clock);
   static void initState(stdAc::state_t *state);
   void markAsSent(void);
@@ -75,6 +86,14 @@ class IRac {
               const bool light, const bool filter, const bool clean,
               const bool beep, const int16_t sleep = -1,
               const int16_t clock = -1);
+  bool sendAc(const decode_type_t vendor, const int16_t model,
+              const bool power, const stdAc::opmode_t mode, const float degrees,
+              const bool celsius, const stdAc::fanspeed_t fan,
+              const stdAc::swingv_t swingv, const stdAc::swingh_t swingh,
+              const bool quiet, const bool turbo, const bool econo,
+              const bool light, const bool filter, const bool clean,
+              const bool beep, const int16_t sleep = -1,
+              const int16_t clock = -1, const int8_t weekday = -1);
   static bool cmpStates(const stdAc::state_t a, const stdAc::state_t b);
   static bool strToBool(const char *str, const bool def = false);
   static int16_t strToModel(const char *str, const int16_t def = -1);
@@ -313,7 +332,7 @@ void electra(IRElectraAc *ac,
                   const float degrees,
                   const stdAc::fanspeed_t fan, const stdAc::swingv_t swingv,
                   const stdAc::swingh_t swingh,
-                  const bool quiet, const int16_t clock = -1);
+                  const bool quiet, const int16_t clock = -1, const int8_t weekday = -1, const bool clean = false, const bool beep = false);
 #endif  // SEND_MITSUBISHI_AC
 #if SEND_MITSUBISHI112
   void mitsubishi112(IRMitsubishi112 *ac,
@@ -358,8 +377,8 @@ void electra(IRElectraAc *ac,
                  const bool on, const stdAc::opmode_t mode, const float degrees,
                  const stdAc::fanspeed_t fan,
                  const stdAc::swingv_t swingv, const stdAc::swingh_t swingh,
-                 const bool quiet, const bool turbo, const bool filter,
-                 const int16_t clock = -1);
+                 const bool quiet, const bool turbo, const bool filter, const bool clean,
+                 const int16_t clock = -1, const bool on_timer = false, const bool off_timer = false);
 #endif  // SEND_PANASONIC_AC
 #if SEND_PANASONIC_AC32
   void panasonic32(IRPanasonicAc32 *ac,

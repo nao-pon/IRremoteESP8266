@@ -92,6 +92,60 @@ void IRac::initState(stdAc::state_t *state,
                      const bool quiet, const bool turbo, const bool econo,
                      const bool light, const bool filter, const bool clean,
                      const bool beep, const int16_t sleep,
+                     const int16_t clock, const int8_t weekday) {
+  state->protocol = vendor;
+  state->model = model;
+  state->power = power;
+  state->mode = mode;
+  state->degrees = degrees;
+  state->celsius = celsius;
+  state->fanspeed = fan;
+  state->swingv = swingv;
+  state->swingh = swingh;
+  state->quiet = quiet;
+  state->turbo = turbo;
+  state->econo = econo;
+  state->light = light;
+  state->filter = filter;
+  state->clean = clean;
+  state->beep = beep;
+  state->sleep = sleep;
+  state->clock = clock;
+  state->weekday = weekday;
+}
+
+/// Initialise the given state with the supplied settings.
+/// @param[out] state A Ptr to where the settings will be stored.
+/// @param[in] vendor The vendor/protocol type.
+/// @param[in] model The A/C model if applicable.
+/// @param[in] power The power setting.
+/// @param[in] mode The operation mode setting.
+/// @param[in] degrees The temperature setting in degrees.
+/// @param[in] celsius Temperature units. True is Celsius, False is Fahrenheit.
+/// @param[in] fan The speed setting for the fan.
+/// @param[in] swingv The vertical swing setting.
+/// @param[in] swingh The horizontal swing setting.
+/// @param[in] quiet Run the device in quiet/silent mode.
+/// @param[in] turbo Run the device in turbo/powerful mode.
+/// @param[in] econo Run the device in economical mode.
+/// @param[in] light Turn on the LED/Display mode.
+/// @param[in] filter Turn on the (ion/pollen/etc) filter mode.
+/// @param[in] clean Turn on the self-cleaning mode. e.g. Mould, dry filters etc
+/// @param[in] beep Enable/Disable beeps when receiving IR messages.
+/// @param[in] sleep Nr. of minutes for sleep mode.
+///  -1 is Off, >= 0 is on. Some devices it is the nr. of mins to run for.
+///  Others it may be the time to enter/exit sleep mode.
+///  i.e. Time in Nr. of mins since midnight.
+/// @param[in] clock The time in Nr. of mins since midnight. < 0 is ignore.
+void IRac::initState(stdAc::state_t *state,
+                     const decode_type_t vendor, const int16_t model,
+                     const bool power, const stdAc::opmode_t mode,
+                     const float degrees, const bool celsius,
+                     const stdAc::fanspeed_t fan,
+                     const stdAc::swingv_t swingv, const stdAc::swingh_t swingh,
+                     const bool quiet, const bool turbo, const bool econo,
+                     const bool light, const bool filter, const bool clean,
+                     const bool beep, const int16_t sleep,
                      const int16_t clock) {
   state->protocol = vendor;
   state->model = model;
@@ -121,7 +175,7 @@ void IRac::initState(stdAc::state_t *state) {
             25, true,  // 25 degrees Celsius
             stdAc::fanspeed_t::kAuto, stdAc::swingv_t::kOff,
             stdAc::swingh_t::kOff, false, false, false, false, false, false,
-            false, -1, -1);
+            false, -1, -1, -1);
 }
 
 /// Get the current internal A/C climate state.
@@ -1369,12 +1423,13 @@ void IRac::midea(IRMideaAC *ac,
 /// @param[in] quiet Run the device in quiet/silent mode.
 /// @param[in] clock The time in Nr. of mins since midnight. < 0 is ignore.
 /// @note Clock can only be set in 10 minute increments. i.e. % 10.
+/// @param[in] beep Enable/Disable beeps when receiving IR messages.
 void IRac::mitsubishi(IRMitsubishiAC *ac,
                       const bool on, const stdAc::opmode_t mode,
                       const float degrees,
                       const stdAc::fanspeed_t fan, const stdAc::swingv_t swingv,
                       const stdAc::swingh_t swingh,
-                      const bool quiet, const int16_t clock) {
+                      const bool quiet, const int16_t clock, const int8_t weekday, const bool clean, const bool beep) {
   ac->begin();
   // Uncomment next line if you *really* need the weekly timer enabled via IRac.
   // ac->setWeeklyTimerEnabled(true);  // Weekly Timer is disabled by default.
@@ -1388,10 +1443,12 @@ void IRac::mitsubishi(IRMitsubishiAC *ac,
   // No Turbo setting available.
   // No Light setting available.
   // No Filter setting available.
-  // No Clean setting available.
-  // No Beep setting available.
+  ac->setClean(clean);
+  // No Beep setting available. But use as WeeklyTimer
+  ac->setBeep(beep); // use as Weekday
   // No Sleep setting available.
   if (clock >= 0) ac->setClock(clock / 10);  // Clock is in 10 min increments.
+  if (weekday >= 0) ac->setWeekday(weekday);
   ac->send();
 }
 #endif  // SEND_MITSUBISHI_AC
@@ -1607,8 +1664,8 @@ void IRac::panasonic(IRPanasonicAc *ac, const panasonic_ac_remote_model_t model,
                      const bool on, const stdAc::opmode_t mode,
                      const float degrees, const stdAc::fanspeed_t fan,
                      const stdAc::swingv_t swingv, const stdAc::swingh_t swingh,
-                     const bool quiet, const bool turbo, const bool filter,
-                     const int16_t clock) {
+                     const bool quiet, const bool turbo, const bool filter, const bool clean,
+                     const int16_t clock, const bool on_timer, const bool off_timer) {
   ac->begin();
   ac->setModel(model);
   ac->setPower(on);
@@ -1620,6 +1677,11 @@ void IRac::panasonic(IRPanasonicAc *ac, const panasonic_ac_remote_model_t model,
   ac->setQuiet(quiet);
   ac->setPowerful(turbo);
   ac->setIon(filter);
+  ac->setClean(clean);
+  if (model == panasonic_ac_remote_model_t::kPanasonicVcs) {
+    ac->setOnTimer(0, on_timer);   // use light
+    ac->setOffTimer(0, off_timer); // use beep
+  }
   // No Light setting available.
   // No Econo setting available.
   // No Clean setting available.
@@ -2267,11 +2329,11 @@ bool IRac::sendAc(const decode_type_t vendor, const int16_t model,
                   const stdAc::swingv_t swingv, const stdAc::swingh_t swingh,
                   const bool quiet, const bool turbo, const bool econo,
                   const bool light, const bool filter, const bool clean,
-                  const bool beep, const int16_t sleep, const int16_t clock) {
+                  const bool beep, const int16_t sleep, const int16_t clock, const int8_t weekday) {
   stdAc::state_t to_send;
   initState(&to_send, vendor, model, power, mode, degrees, celsius, fan, swingv,
             swingh, quiet, turbo, econo, light, filter, clean, beep, sleep,
-            clock);
+            clock, weekday);
   return this->sendAc(to_send, &to_send);
 }
 
@@ -2571,7 +2633,7 @@ bool IRac::sendAc(const stdAc::state_t desired, const stdAc::state_t *prev) {
     {
       IRMitsubishiAC ac(_pin, _inverted, _modulation);
       mitsubishi(&ac, send.power, send.mode, degC, send.fanspeed, send.swingv,
-                 send.swingh, send.quiet, send.clock);
+                 send.swingh, send.quiet, send.clock, send.weekday, send.clean, send.beep);
       break;
     }
 #endif  // SEND_MITSUBISHI_AC
@@ -2627,7 +2689,7 @@ bool IRac::sendAc(const stdAc::state_t desired, const stdAc::state_t *prev) {
       IRPanasonicAc ac(_pin, _inverted, _modulation);
       panasonic(&ac, (panasonic_ac_remote_model_t)send.model, send.power,
                 send.mode, degC, send.fanspeed, send.swingv, send.swingh,
-                send.quiet, send.turbo, send.clock);
+                send.quiet, send.turbo, send.filter, send.clean, send.clock, send.light, send.beep);
       break;
     }
 #endif  // SEND_PANASONIC_AC
@@ -2781,7 +2843,7 @@ bool IRac::cmpStates(const stdAc::state_t a, const stdAc::state_t b) {
       a.fanspeed != b.fanspeed || a.swingv != b.swingv ||
       a.swingh != b.swingh || a.quiet != b.quiet || a.turbo != b.turbo ||
       a.econo != b.econo || a.light != b.light || a.filter != b.filter ||
-      a.clean != b.clean || a.beep != b.beep || a.sleep != b.sleep;
+      a.clean != b.clean || a.beep != b.beep || a.sleep != b.sleep || a.weekday != b.weekday;
 }
 
 /// Check if the internal state has changed from what was previously sent.
